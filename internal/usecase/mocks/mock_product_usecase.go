@@ -64,11 +64,11 @@ func (m *MockProductUseCase) GetProduct(ctx context.Context, id int64) (*domain.
 	return r0, ret.Error(1)
 }
 
-// UpdateProduct provides a mock function with given fields: ctx, id, req
-func (m *MockProductUseCase) UpdateProduct(ctx context.Context, id int64, req *domain.UpdateProductRequest) error {
-	ret := m.Called(ctx, id, req)
-	if rf, ok := ret.Get(0).(func(context.Context, int64, *domain.UpdateProductRequest) error); ok {
-		return rf(ctx, id, req)
+// UpdateProduct provides a mock function with given fields: ctx, id, updates
+func (m *MockProductUseCase) UpdateProduct(ctx context.Context, id int64, updates map[string]interface{}) error {
+	ret := m.Called(ctx, id, updates)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, map[string]interface{}) error); ok {
+		return rf(ctx, id, updates)
 	}
 	return ret.Error(0)
 }
@@ -106,7 +106,7 @@ func (e *MockProductUseCaseExpectations) GetProduct(ctx interface{}, id interfac
 // UpdateProduct is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id int64
-//   - req *domain.UpdateProductRequest
-func (e *MockProductUseCaseExpectations) UpdateProduct(ctx interface{}, id interface{}, req interface{}) *mock.Call {
-	return e.mock.On("UpdateProduct", ctx, id, req)
+//   - updates map[string]interface{}
+func (e *MockProductUseCaseExpectations) UpdateProduct(ctx interface{}, id interface{}, updates interface{}) *mock.Call {
+	return e.mock.On("UpdateProduct", ctx, id, updates)
 }

@@ -176,9 +176,9 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 			Once()
 
 		uc := NewProductUseCase(mockRepo)
-		err := uc.UpdateProduct(context.Background(), 1, &domain.UpdateProductRequest{
-			Name:  ptrString("Updated"),
-			Price: &newPrice,
+		err := uc.UpdateProduct(context.Background(), 1, map[string]interface{}{
+			"name":  "Updated",
+			"price": newPrice,
 		})
 
 		require.NoError(t, err)
@@ -203,8 +203,8 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 			Once()
 
 		uc := NewProductUseCase(mockRepo)
-		err := uc.UpdateProduct(context.Background(), 1, &domain.UpdateProductRequest{
-			Price: &newPrice,
+		err := uc.UpdateProduct(context.Background(), 1, map[string]interface{}{
+			"price": newPrice,
 		})
 
 		require.NoError(t, err)
@@ -214,7 +214,7 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 		mockRepo := mocks.NewProductRepository(t)
 
 		uc := NewProductUseCase(mockRepo)
-		err := uc.UpdateProduct(context.Background(), -1, &domain.UpdateProductRequest{})
+		err := uc.UpdateProduct(context.Background(), -1, map[string]interface{}{})
 
 		require.Error(t, err)
 		assert.Equal(t, ErrInvalidProductID, err)
@@ -228,7 +228,7 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 			Once()
 
 		uc := NewProductUseCase(mockRepo)
-		err := uc.UpdateProduct(context.Background(), 9999, &domain.UpdateProductRequest{})
+		err := uc.UpdateProduct(context.Background(), 9999, map[string]interface{}{})
 
 		require.Error(t, err)
 		assert.Equal(t, sql.ErrNoRows, err)
@@ -248,8 +248,8 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 			Once()
 
 		uc := NewProductUseCase(mockRepo)
-		err := uc.UpdateProduct(context.Background(), 1, &domain.UpdateProductRequest{
-			Name: ptrString(""),
+		err := uc.UpdateProduct(context.Background(), 1, map[string]interface{}{
+			"name": "",
 		})
 
 		require.Error(t, err)
@@ -271,8 +271,8 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 			Once()
 
 		uc := NewProductUseCase(mockRepo)
-		err := uc.UpdateProduct(context.Background(), 1, &domain.UpdateProductRequest{
-			Price: &negPrice,
+		err := uc.UpdateProduct(context.Background(), 1, map[string]interface{}{
+			"price": negPrice,
 		})
 
 		require.Error(t, err)

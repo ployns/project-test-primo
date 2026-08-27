@@ -119,7 +119,7 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Product ID"
-// @Param input body domain.UpdateProductRequest true "Update product request"
+// @Param input body object true "Update product request (supports: name, description, price, sale_price)"
 // @Success 200 {object} domain.Response
 // @Failure 400 {object} domain.Response
 // @Router /product/{id} [patch]
@@ -134,7 +134,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	var req domain.UpdateProductRequest
+	var req map[string]interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, domain.Response{
 			Successful: false,
@@ -144,7 +144,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	err = h.uc.UpdateProduct(c.Request.Context(), id, &req)
+	err = h.uc.UpdateProduct(c.Request.Context(), id, req)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, domain.Response{

@@ -9,7 +9,7 @@ import (
 type ProductUseCase interface {
 	CreateProduct(ctx context.Context, req *domain.CreateProductRequest) (*domain.Product, error)
 	GetProduct(ctx context.Context, id int64) (*domain.Product, error)
-	UpdateProduct(ctx context.Context, id int64, req *domain.UpdateProductRequest) error
+	UpdateProduct(ctx context.Context, id int64, updates map[string]interface{}) error
 	DeleteProduct(ctx context.Context, id int64) error
 }
 
@@ -46,7 +46,7 @@ func (uc *productUseCase) GetProduct(ctx context.Context, id int64) (*domain.Pro
 	return uc.repo.GetByID(ctx, id)
 }
 
-func (uc *productUseCase) UpdateProduct(ctx context.Context, id int64, req *domain.UpdateProductRequest) error {
+func (uc *productUseCase) UpdateProduct(ctx context.Context, id int64, updates map[string]interface{}) error {
 	if id <= 0 {
 		return ErrInvalidProductID
 	}
@@ -56,23 +56,38 @@ func (uc *productUseCase) UpdateProduct(ctx context.Context, id int64, req *doma
 		return err
 	}
 
-	if req.Name != nil {
-		if *req.Name == "" {
+	if name, ok := updates["name"]; ok {
+		nameStr, ok := name.(string)
+		if !ok || nameStr == "" {
 			return ErrInvalidProductName
 		}
-		existing.Name = *req.Name
+		existing.Name = nameStr
 	}
-	if req.Description != nil {
-		existing.Description = req.Description
+
+	if description, ok := updates["description"]; ok {
+		if description != nil {
+			descStr, ok := description.(string)
+			if ok {
+				existing.Description = &descStr
+			}
+		}
 	}
-	if req.Price != nil {
-		if *req.Price <= 0 {
+
+	if price, ok := updates["price"]; ok {
+		priceFloat, ok := price.(float64)
+		if !ok || priceFloat <= 0 {
 			return ErrInvalidPrice
 		}
-		existing.Price = *req.Price
+		existing.Price = priceFloat
 	}
-	if req.SalePrice != nil {
-		existing.SalePrice = req.SalePrice
+
+	if salePrice, ok := updates["sale_price"]; ok {
+		if salePrice != nil {
+			salePriceFloat, ok := salePrice.(float64)
+			if ok {
+				existing.SalePrice = &salePriceFloat
+			}
+		}
 	}
 
 	return uc.repo.Update(ctx, id, existing)

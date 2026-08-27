@@ -11,53 +11,43 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	_ "github.com/lib/pq"
 
-	"project-test-primo/internal/db"
 	"project-test-primo/internal/domain"
 	"project-test-primo/internal/handler"
-	"project-test-primo/internal/repository"
+	"project-test-primo/internal/repository/mocks"
 	"project-test-primo/internal/usecase"
 )
 
-func setupE2ETest(t *testing.T) (*sql.DB, *gin.Engine) {
-	database, err := sql.Open("postgres", "postgres://postgres:postgres@localhost:5432/test_db?sslmode=disable")
-	require.NoError(t, err)
-
-	err = database.Ping()
-	require.NoError(t, err)
-
-	schema := `
-	DROP TABLE IF EXISTS products;
-	CREATE TABLE products (
-		id SERIAL PRIMARY KEY,
-		name VARCHAR(255) NOT NULL,
-		description TEXT,
-		price DOUBLE PRECISION NOT NULL,
-		sale_price DOUBLE PRECISION,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
-	`
-	_, err = database.Exec(schema)
-	require.NoError(t, err)
-
-	productRepo := repository.NewProductRepository(database)
-	productUC := usecase.NewProductUseCase(productRepo)
+func setupE2ETest(t *testing.T) (*mocks.MockProductRepository, *gin.Engine) {
+	mockRepo := mocks.NewProductRepository(t)
+	productUC := usecase.NewProductUseCase(mockRepo)
 	productHandler := handler.NewProductHandler(productUC)
 
 	router := gin.Default()
 	productHandler.RegisterRoutes(router)
 
-	return database, router
+	return mockRepo, router
 }
 
 func TestE2E_CreateAndRetrieveProduct(t *testing.T) {
-	database, router := setupE2ETest(t)
-	defer database.Close()
+	mockRepo, router := setupE2ETest(t)
 
 	t.Run("create product and retrieve it", func(t *testing.T) {
+		mockRepo.EXPECT().Create(context.Background(), mock.MatchedBy(func(p *domain.Product) bool {
+			return p.Name == "Laptop" && p.Price == 1299.99
+		})).Return(&domain.Product{
+			ID:    1,
+			Name:  "Laptop",
+			Price: 1299.99,
+		}, nil)
+
+		mockRepo.EXPECT().GetByID(context.Background(), int64(1)).Return(&domain.Product{
+			ID:    1,
+			Name:  "Laptop",
+			Price: 1299.99,
+		}, nil)
 		createBody := []byte(`{
 			"name": "Laptop",
 			"description": "A powerful laptop",
@@ -95,10 +85,26 @@ func TestE2E_CreateAndRetrieveProduct(t *testing.T) {
 }
 
 func TestE2E_CreateUpdateDelete(t *testing.T) {
-	database, router := setupE2ETest(t)
-	defer database.Close()
+	mockRepo, router := setupE2ETest(t)
 
 	t.Run("full CRUD workflow", func(t *testing.T) {
+		mockRepo.EXPECT().Create(context.Background(), mock.MatchedBy(func(p *domain.Product) bool {
+			return p.Name == "Mouse" && p.Price == 49.99
+		})).Return(&domain.Product{
+			ID:    1,
+			Name:  "Mouse",
+			Price: 49.99,
+		}, nil)
+
+		mockRepo.EXPECT().Update(context.Background(), int64(1), mock.Anything).Return(nil)
+
+		mockRepo.EXPECT().GetByID(context.Background(), int64(1)).Return(&domain.Product{
+			ID:    1,
+			Name:  "Wireless Mouse",
+			Price: 49.99,
+		}, nil)
+
+		mockRepo.EXPECT().Delete(context.Background(), int64(1)).Return(nil)
 		createBody := []byte(`{
 			"name": "Mouse",
 			"price": 49.99
@@ -151,15 +157,14 @@ func TestE2E_CreateUpdateDelete(t *testing.T) {
 
 		notFoundReq := httptest.NewRequest("GET", "/product/1", nil)
 		notFoundW := httptest.NewRecorder()
-		router.ServeHTTP(notFoundReq, notFoundReq)
+		router.ServeHTTP(notFoundW, notFoundReq)
 
 		assert.Equal(t, http.StatusOK, notFoundW.Code)
 	})
 }
 
 func TestE2E_ValidationScenarios(t *testing.T) {
-	database, router := setupE2ETest(t)
-	defer database.Close()
+	mockRepo, router := setupE2ETest(t)
 
 	t.Run("create product without name should fail", func(t *testing.T) {
 		body := []byte(`{"price": 99.99}`)
@@ -190,6 +195,8 @@ func TestE2E_ValidationScenarios(t *testing.T) {
 	})
 
 	t.Run("get non-existent product should return not found", func(t *testing.T) {
+		mockRepo.EXPECT().GetByID(context.Background(), int64(9999)).Return(nil, sql.ErrNoRows)
+
 		req := httptest.NewRequest("GET", "/product/9999", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
@@ -204,10 +211,24 @@ func TestE2E_ValidationScenarios(t *testing.T) {
 }
 
 func TestE2E_PartialUpdate(t *testing.T) {
-	database, router := setupE2ETest(t)
-	defer database.Close()
+	mockRepo, router := setupE2ETest(t)
 
 	t.Run("update only specific fields", func(t *testing.T) {
+		mockRepo.EXPECT().Create(context.Background(), mock.MatchedBy(func(p *domain.Product) bool {
+			return p.Name == "Keyboard" && p.Price == 149.99
+		})).Return(&domain.Product{
+			ID:    1,
+			Name:  "Keyboard",
+			Price: 149.99,
+		}, nil)
+
+		mockRepo.EXPECT().Update(context.Background(), int64(1), mock.Anything).Return(nil)
+
+		mockRepo.EXPECT().GetByID(context.Background(), int64(1)).Return(&domain.Product{
+			ID:    1,
+			Name:  "Keyboard",
+			Price: 199.99,
+		}, nil)
 		createBody := []byte(`{
 			"name": "Keyboard",
 			"description": "Mechanical keyboard",
@@ -245,5 +266,45 @@ func TestE2E_PartialUpdate(t *testing.T) {
 		data := getResp.Data.(map[string]interface{})
 		assert.Equal(t, "Keyboard", data["data2"])
 		assert.Equal(t, 199.99, data["price"])
+	})
+}
+
+func TestE2E_UpdateZeroPrice(t *testing.T) {
+	mockRepo, router := setupE2ETest(t)
+
+	t.Run("update price to zero should fail validation", func(t *testing.T) {
+		mockRepo.EXPECT().Create(context.Background(), mock.MatchedBy(func(p *domain.Product) bool {
+			return p.Name == "Product" && p.Price == 50.0
+		})).Return(&domain.Product{
+			ID:    1,
+			Name:  "Product",
+			Price: 50.0,
+		}, nil)
+
+		mockRepo.EXPECT().GetByID(context.Background(), int64(1)).Return(&domain.Product{
+			ID:    1,
+			Name:  "Product",
+			Price: 50.0,
+		}, nil)
+
+		createBody := []byte(`{"name": "Product", "price": 50}`)
+		createReq := httptest.NewRequest("POST", "/product", bytes.NewBuffer(createBody))
+		createReq.Header.Set("Content-Type", "application/json")
+		createW := httptest.NewRecorder()
+		router.ServeHTTP(createW, createReq)
+
+		assert.Equal(t, http.StatusOK, createW.Code)
+
+		updateBody := []byte(`{"price": 0}`)
+		updateReq := httptest.NewRequest("PATCH", "/product/1", bytes.NewBuffer(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateW := httptest.NewRecorder()
+		router.ServeHTTP(updateW, updateReq)
+
+		assert.Equal(t, http.StatusBadRequest, updateW.Code)
+
+		var updateResp domain.Response
+		json.Unmarshal(updateW.Body.Bytes(), &updateResp)
+		assert.False(t, updateResp.Successful)
 	})
 }

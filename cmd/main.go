@@ -24,7 +24,7 @@ import (
 // @BasePath /
 // @schemes http
 func main() {
-	godotenv.Load()
+	godotenv.Load(".env.dev")
 
 	database, err := db.NewPostgresDB()
 	if err != nil {
